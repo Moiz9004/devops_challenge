@@ -1,0 +1,132 @@
+#Download and install terraform on local  machine
+#configure aws acc key details in local macine
+#creating the configuration file of terraform
+
+provider "aws" {
+    region = "eu-west-1"
+    version = "~> 0.1"
+}
+
+resource "aws_security_group" "Docker_nginx" {
+    name = "Docker_nginx"
+    # Open up incoming ssh port
+    ingress {
+        from_port = 22
+        to_port = 22
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    # Open up incoming traffic to port 80 used by Docker_nginx
+    ingress {
+        from_port   = 80
+        to_port     = 80
+        protocol    = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    # Open up outbound internet access
+    egress {
+        from_port   = 0
+        to_port     = 0
+        protocol    = "-1"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+}
+
+resource "aws_instance" "Node" {
+    count = 1
+    ami = "ami-a8d2d7ce"
+    instance_type = "m4.xlarge"
+    key_name = "mac-ssh"
+    tags {
+        Name = "Jupyter Notebook Meganode"
+    }
+    vpc_security_group_ids = ["${aws_security_group.Docker_nginx.id}"]
+
+    provisioner "file" {
+        source      = "configure.sh"
+        destination = "/tmp/configure.sh"
+
+        connection {
+            type     = "ssh"
+            user     = "ubuntu"
+            private_key = "${file("~/.aws/mac-ssh.pem")}"
+        }
+    }
+
+    provisioner "remote-exec" {
+        inline = [
+            "chmod +x /tmp/configure.sh",
+            "/tmp/configure.sh",
+        ]
+        connection {
+            type     = "ssh"
+            user     = "ubuntu"
+            private_key = "${file("~/.aws/mac-ssh.pem")}"
+        }
+
+    }
+
+}
+
+output "node_dns_name" {
+    value = "${aws_instance.Node.public_dns}"
+}
+And this the configure.sh:
+
+2. CREATE A DOCKERFILE OF A NGINX CONTAINER.
+
+
+!#/bin/bash
+
+sudo apt-get update
+sudo apt-get -y install git
+sudo apt-get -y install vim
+
+sudo -H apt-get install Docker
+
+
+#
+# Nginx Dockerfile
+
+# Pull base image.
+FROM dockerfile/ubuntu
+
+# Install Nginx.
+RUN \
+  add-apt-repository -y ppa:nginx/stable && \
+  apt-get update && \
+  apt-get install -y nginx && \
+  rm -rf /var/lib/apt/lists/* && \
+  echo "\ndaemon off;" >> /etc/nginx/nginx.conf && \
+  chown -R www-data:www-data /var/lib/nginx
+
+# Define mountable directories.
+VOLUME ["/etc/nginx/sites-enabled", "/etc/nginx/certs", "/etc/nginx/conf.d", "/var/log/nginx", "/var/www/html"]
+
+# Define working directory.
+WORKDIR /etc/nginx
+
+# Define default command.
+CMD ["nginx"]
+
+# Expose ports.
+EXPOSE 80
+EXPOSE 443
+
+The first time we run terraform with any blueprint we to initialize it.
+#terraform init
+#terraform plan
+#terraform apply
+
+After '#terraform apply' we will get the public DNS name of the provision VM.To login into into this VM we can use following 
+command "#ssh -i ~/.aws/mac-ssh.pem ubuntu@<public-dns-name>"
+
+docker build -t "NAME:Dockerfile"
+
+
+
+
+
+NOTE : we have used passowrd less SSH for crediantials handling and this is very secure beacuse the person having the private key can only access the VM.
