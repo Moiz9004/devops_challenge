@@ -11,3 +11,7 @@ We would like to see your considerations for credentials handling in this scenar
 The challenge is expected to take between 2-4 hours.  
 
 In order to submit your solution a fork of this repo has to be created, and the solution can be committed to the fork.
+
+
+
+Please read the uploaded Docker file.
